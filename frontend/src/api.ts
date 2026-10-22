@@ -66,7 +66,7 @@ export async function updateProfile(token: string, values: { name?: string; targ
 }
 
 export type RemoteExamQuestion = { id: string; subject: Subject; chapter: string; text: string; options: string[] }
-export type RemoteTestSession = { id: string; status: string; questions: RemoteExamQuestion[]; answers: Record<string, number>; marked: number[]; expires_at: string; score?: number }
+export type RemoteTestSession = { id: string; status: string; questions: RemoteExamQuestion[]; answers: Record<string, number>; marked: number[]; expires_at: string; score?: number; correct?: number; incorrect?: number; unanswered?: number }
 
 export async function createRemoteTestSession(token: string, config?: { subject?: Subject | 'Mixed'; classLevel?: ClassLevel; chapter?: string; questions?: number; durationMinutes?: number; difficulty?: 'Easy' | 'Medium' | 'Hard' | 'Mixed' }): Promise<RemoteTestSession | null> {
   const response = await request('/api/tests/sessions', {
