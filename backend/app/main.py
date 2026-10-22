@@ -385,7 +385,13 @@ def create_test_session(config: TestConfig, user: dict[str, Any] = Depends(requi
     if not available:
         raise HTTPException(status_code=422, detail="No approved questions are available for this configuration.")
     SystemRandom().shuffle(available)
-    questions = available[:min(config.questions, len(available))]
+    # Keep the student's requested test size even when a narrow chapter has a
+    # smaller approved pool. Reuse the pool with unique session ids instead of
+    # silently opening a shorter test.
+    questions = [
+        {**available[index % len(available)], "id": f"{available[index % len(available)]['id']}-slot-{index + 1}"}
+        for index in range(config.questions)
+    ]
     session = db.create_session(user["id"], config.model_dump(), questions, config.duration_minutes)
     return {"session": session, "question_count": len(questions), "notice": "Curated starter questions and full-syllabus chapter checks are available. Add approved PYQs for production exam simulation."}
 
@@ -424,8 +430,8 @@ def submit_test_session(session_id: str, user: dict[str, Any] = Depends(required
     db.create_attempt(user["id"], {"test_id": session_id, "score": session["score"], "correct": session["correct"], "incorrect": session["incorrect"], "unanswered": session["unanswered"], "duration_seconds": 0})
     for question_index, question in enumerate(session["questions"]):
         answer = session["answers"].get(str(question_index))
-        if answer is not None and answer != question.get("answer"):
-            db.create_study_item(user["id"], {"kind": "mistake", "subject": question["subject"], "class_level": session["config"].get("class_level", "Mixed"), "chapter": question["chapter"], "title": f"Retry: {question['chapter']}", "reason": "Incorrect answer in a timed test; review the anchor before retrying.", "priority": "High", "duration_minutes": 15})
+        if answer is None or answer != question.get("answer"):
+            db.create_study_item(user["id"], {"kind": "mistake", "subject": question["subject"], "class_level": session["config"].get("class_level", "Mixed"), "chapter": question["chapter"], "title": f"Retry: {question['chapter']}", "reason": "Unanswered in a timed test; review the anchor before retrying." if answer is None else "Incorrect answer in a timed test; review the anchor before retrying.", "priority": "High", "duration_minutes": 15, "details": {"questionText": question.get("text", ""), "options": question.get("options", []), "selectedAnswer": answer, "correctAnswer": question.get("answer", 0), "explanation": question.get("explanation", "Review the concept anchor and compare your reasoning with the correct option.")}})
             db.create_study_item(user["id"], {"kind": "queue", "subject": question["subject"], "class_level": session["config"].get("class_level", "Mixed"), "chapter": question["chapter"], "title": f"Revise {question['chapter']}", "reason": "Generated from your latest incorrect answer.", "priority": "High", "duration_minutes": 15})
     db.record_progress_event(user["id"], "question_solved", session["correct"] + session["incorrect"])
     db.record_progress_event(user["id"], "session_completed", 1)

@@ -99,7 +99,14 @@ export async function submitRemoteTestSession(token: string, sessionId: string):
   return payload.session
 }
 
-export type StudyItem = { id: string; kind: 'queue' | 'planner' | 'mistake'; subject: Subject; class_level: ClassLevel; chapter: string; title: string; reason: string; priority: 'High' | 'Medium' | 'Low'; duration_minutes: number; status: 'open' | 'completed'; due_date: string | null }
+export type StudyItemDetails = {
+  questionText: string
+  options: string[]
+  selectedAnswer: number | null
+  correctAnswer: number
+  explanation: string
+}
+export type StudyItem = { id: string; kind: 'queue' | 'planner' | 'mistake'; subject: Subject; class_level: ClassLevel; chapter: string; title: string; reason: string; priority: 'High' | 'Medium' | 'Low'; duration_minutes: number; status: 'open' | 'completed'; due_date: string | null; details?: StudyItemDetails | null }
 export type AnalyticsSnapshot = { attempt_count: number; average_score: number; best_score: number; recent_scores: number[]; open_items: number; subject_accuracy: Record<string, number>; recommendation: string }
 
 async function authedJson(path: string, token: string, init: RequestInit = {}) {

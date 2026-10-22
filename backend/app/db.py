@@ -112,7 +112,8 @@ def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'open',
                 due_date TEXT,
                 created_at TEXT NOT NULL,
-                completed_at TEXT
+                completed_at TEXT,
+                details TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_test_attempts_user_created
@@ -121,6 +122,9 @@ def init_db() -> None:
                 ON study_items(user_id, status, due_date);
             """
         )
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(study_items)").fetchall()}
+        if "details" not in columns:
+            connection.execute("ALTER TABLE study_items ADD COLUMN details TEXT")
 
 
 def hash_password(password: str) -> str:
@@ -394,18 +398,24 @@ def create_study_item(user_id: str, values: dict[str, Any]) -> dict[str, Any]:
         "due_date": values.get("due_date"),
         "created_at": now_iso(),
         "completed_at": None,
+        "details": json.dumps(values.get("details")) if values.get("details") is not None else None,
     }
     with connect() as connection:
         connection.execute(
             """
             INSERT INTO study_items
-            (id, user_id, kind, subject, class_level, chapter, title, reason, priority, duration_minutes, status, due_date, created_at, completed_at)
-            VALUES (:id, :user_id, :kind, :subject, :class_level, :chapter, :title, :reason, :priority, :duration_minutes, :status, :due_date, :created_at, :completed_at)
+            (id, user_id, kind, subject, class_level, chapter, title, reason, priority, duration_minutes, status, due_date, created_at, completed_at, details)
+            VALUES (:id, :user_id, :kind, :subject, :class_level, :chapter, :title, :reason, :priority, :duration_minutes, :status, :due_date, :created_at, :completed_at, :details)
             """,
             item,
         )
-    item.pop("user_id")
-    return item
+    return _study_item_public(item)
+
+
+def _study_item_public(item: dict[str, Any]) -> dict[str, Any]:
+    public = {key: value for key, value in item.items() if key != "user_id"}
+    public["details"] = _json(public.get("details"), None)
+    return public
 
 
 def list_study_items(user_id: str, kind: str | None = None, status: str | None = None) -> list[dict[str, Any]]:
@@ -422,7 +432,7 @@ def list_study_items(user_id: str, kind: str | None = None, status: str | None =
             f"SELECT * FROM study_items WHERE {' AND '.join(clauses)} ORDER BY CASE priority WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END, due_date IS NULL, due_date, created_at DESC",
             params,
         ).fetchall()
-    return [{key: value for key, value in dict(row).items() if key != "user_id"} for row in rows]
+    return [_study_item_public(dict(row)) for row in rows]
 
 
 def complete_study_item(user_id: str, item_id: str) -> dict[str, Any] | None:
@@ -433,7 +443,7 @@ def complete_study_item(user_id: str, item_id: str) -> dict[str, Any] | None:
             (timestamp, item_id, user_id),
         )
         row = connection.execute("SELECT * FROM study_items WHERE id = ? AND user_id = ?", (item_id, user_id)).fetchone()
-    return {key: value for key, value in dict(row).items() if key != "user_id"} if row else None
+    return _study_item_public(dict(row)) if row else None
 
 
 def analytics(user_id: str) -> dict[str, Any]:
