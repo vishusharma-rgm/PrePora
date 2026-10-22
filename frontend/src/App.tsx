@@ -7,10 +7,10 @@ import {
   Sun, Target, Trophy, UserRound, X, Zap,
 } from 'lucide-react'
 import { ExamExperience, ImproveExperience, LearnExperience, PracticeExperience, type ExamLaunchConfig } from './productionFeatures'
-import { FreshDashboard, FreshImprove, FreshPlan, MinimalLoginScreen, PremiumLandingV3, ReviewMistakesExperienceV2, TutorExperienceAdvanced, WorkspaceOverlay } from './workspaceExtras'
+import { AnalyticsExperience, DashboardNextMove, FreshDashboard, FreshImprove, FreshPlan, LibraryExperience, MinimalLoginScreen, PremiumLandingV3, PYQExperience, ReviewMistakesExperienceV2, RevisionHubExperience, TestCenterExperience, TutorExperienceAdvanced, WorkspaceOverlay } from './workspaceExtras'
 import { authenticate } from './api'
 
-type Page = 'dashboard' | 'learn' | 'practice' | 'improve' | 'plan' | 'tutor'
+type Page = 'dashboard' | 'learn' | 'practice' | 'tests' | 'pyqs' | 'revision' | 'improve' | 'analytics' | 'plan' | 'tutor' | 'library'
 type Subject = 'Physics' | 'Chemistry' | 'Biology'
 type ClassLevel = '11th' | '12th' | 'Mixed'
 
@@ -90,12 +90,21 @@ function App() {
         <div className="brand"><span className="brand-mark"><Sparkles size={17} /></span><span>prepora</span></div>
         <div className="sidebar-label">Workspace</div>
         <nav>
+          <div className="sidebar-group-label">Study</div>
           <NavItem icon={<LayoutDashboard size={18} />} label="Home" active={page === 'dashboard'} onClick={() => { setPage('dashboard'); setMobileNav(false) }} />
           <NavItem icon={<BookOpen size={18} />} label="Learn" active={page === 'learn'} onClick={() => { setPage('learn'); setMobileNav(false) }} />
           <NavItem icon={<ListChecks size={18} />} label="Practice" active={page === 'practice'} onClick={() => { setPage('practice'); setMobileNav(false) }} />
+          <NavItem icon={<RotateCcw size={18} />} label="Revision" active={page === 'revision'} onClick={() => { setPage('revision'); setMobileNav(false) }} />
+          <div className="sidebar-group-label">Tests</div>
+          <NavItem icon={<FileText size={18} />} label="Test Center" active={page === 'tests'} onClick={() => { setPage('tests'); setMobileNav(false) }} />
+          <NavItem icon={<Target size={18} />} label="PYQs" active={page === 'pyqs'} onClick={() => { setPage('pyqs'); setMobileNav(false) }} />
+          <div className="sidebar-group-label">Progress</div>
           <NavItem icon={<BarChart3 size={18} />} label="Improve" active={page === 'improve'} badge={demoMode && savedQuestions.length ? savedQuestions.length.toString() : undefined} onClick={() => { setReviewMode(false); setPage('improve'); setMobileNav(false) }} />
+          <NavItem icon={<BarChart3 size={18} />} label="Analytics" active={page === 'analytics'} onClick={() => { setPage('analytics'); setMobileNav(false) }} />
           <NavItem icon={<Target size={18} />} label="Plan" active={page === 'plan'} onClick={() => { setPage('plan'); setMobileNav(false) }} />
+          <div className="sidebar-group-label">Support</div>
           <NavItem icon={<MessageCircle size={18} />} label="AI tutor" active={page === 'tutor'} onClick={() => { setPage('tutor'); setMobileNav(false) }} />
+          <NavItem icon={<BookOpen size={18} />} label="My Library" active={page === 'library'} onClick={() => { setPage('library'); setMobileNav(false) }} />
         </nav>
         <div className="sidebar-spacer" />
         <div className="exam-mini"><div className="mini-kicker">Your target exam</div><strong>NEET-UG 2027</strong><div className="mini-progress"><span style={{ width: '32%' }} /></div><small>192 days left</small></div>
@@ -113,16 +122,21 @@ function App() {
 
         {examActive ? <ExamExperience config={examConfig} userKey={profile?.email ?? 'demo'} onFinish={submitExam} /> : result !== null ? <ResultScreenV2 result={result} onReviewMistakes={() => { setReviewMode(true); setPage('improve'); setResult(null) }} onPractice={() => { setReviewMode(false); setPage('practice'); setResult(null) }} /> : <>
           {demoMode && <div className="demo-banner"><Sparkles size={14} /> Demo Mode · Sample data is isolated from real student records <button onClick={signOut}>Exit demo</button></div>}
-          {page === 'dashboard' && (demoMode ? <Dashboard onGenerate={() => setShowGenerator(true)} onNavigate={setPage} /> : <FreshDashboard name={profile?.name ?? 'Student'} stats={accountStats} onGenerate={() => setShowGenerator(true)} onNavigate={setPage} />)}
+          {page === 'dashboard' && <><div>{demoMode ? <Dashboard onGenerate={() => setShowGenerator(true)} onNavigate={setPage} /> : <FreshDashboard name={profile?.name ?? 'Student'} stats={accountStats} onGenerate={() => setShowGenerator(true)} onNavigate={setPage} />}</div><DashboardNextMove onNavigate={setPage} /></>}
           {page === 'learn' && <LearnExperience onTutor={() => setPage('tutor')} onPractice={() => setPage('practice')} />}
           {page === 'practice' && <PracticeExperience onBuildTest={() => setShowGenerator(true)} onStartExam={startExam} />}
+          {page === 'tests' && <TestCenterExperience onBuildTest={() => setShowGenerator(true)} onStartExam={startExam} />}
+          {page === 'pyqs' && <PYQExperience />}
+          {page === 'revision' && <RevisionHubExperience />}
           {page === 'improve' && (reviewMode
             ? <ReviewMistakesExperienceV2 name={profile?.name ?? 'Student'} demo={demoMode} userKey={profile?.email ?? 'demo'} onBack={() => setReviewMode(false)} onTutor={() => { setReviewMode(false); setPage('tutor') }} />
             : demoMode
               ? <ImproveExperience onTutor={() => setPage('tutor')} />
               : <FreshImprove name={profile?.name ?? 'Student'} onTutor={() => setPage('tutor')} />)}
+          {page === 'analytics' && <AnalyticsExperience />}
           {page === 'plan' && (demoMode ? <PlanArea queueDone={queueDone} setQueueDone={setQueueDone} completed={completedTasks} setCompleted={setCompletedTasks} /> : <FreshPlan name={profile?.name ?? 'Student'} onLearn={() => setPage('learn')} />)}
           {page === 'tutor' && <TutorExperienceAdvanced />}
+          {page === 'library' && <LibraryExperience />}
         </>}
       </main>
       {showGenerator && <TestGeneratorV2 onClose={() => setShowGenerator(false)} onStart={startExam} />}
@@ -132,7 +146,7 @@ function App() {
   )
 }
 
-function pageLabel(page: Page) { return ({ dashboard: 'Home', learn: 'Learn', practice: 'Practice', improve: 'Improve', plan: 'Plan', tutor: 'AI tutor' })[page] }
+function pageLabel(page: Page) { return ({ dashboard: 'Home', learn: 'Learn', practice: 'Practice', tests: 'Test Center', pyqs: 'PYQs', revision: 'Revision', improve: 'Improve', analytics: 'Analytics', plan: 'Plan', tutor: 'AI tutor', library: 'My Library' })[page] }
 
 function NavItem({ icon, label, active, badge, onClick }: { icon: React.ReactNode; label: string; active?: boolean; badge?: string; onClick: () => void }) {
   return <button className={active ? 'nav-item active' : 'nav-item'} onClick={onClick}>{icon}<span>{label}</span>{badge && <em>{badge}</em>}</button>
