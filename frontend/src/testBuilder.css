@@ -1,0 +1,126 @@
+/* Test builder: opaque, scrollable and usable on small screens. */
+.modal-backdrop {
+  overflow-y: auto;
+}
+
+.modal.generator {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(780px, calc(100dvh - 32px));
+  overflow-y: auto;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.modal.generator .modal-head {
+  position: sticky;
+  top: -26px;
+  z-index: 3;
+  padding: 2px 0 18px;
+  background: #fff;
+}
+
+.modal.generator .form-grid select {
+  min-height: 42px;
+}
+
+@media (max-width: 760px) {
+  .modal-backdrop {
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .modal.generator {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 18px;
+    border-radius: 15px;
+  }
+
+  .modal.generator .modal-head {
+    top: -18px;
+    padding: 18px 0 14px;
+    margin-bottom: 4px;
+  }
+
+  .modal.generator .modal-head h2 {
+    font-size: 21px;
+    line-height: 1.15;
+    padding-right: 34px;
+  }
+
+  .modal.generator .modal-head p {
+    font-size: 11px;
+    line-height: 1.45;
+    max-width: 270px;
+  }
+
+  .modal.generator .form-grid {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .modal.generator .form-grid select {
+    min-height: 46px;
+    font-size: 16px;
+    padding: 10px 11px;
+  }
+
+  .modal.generator .generator-section {
+    margin-top: 18px;
+  }
+
+  .modal.generator .segmented {
+    min-height: 48px;
+  }
+
+  .modal.generator .segmented button {
+    min-height: 40px;
+    font-size: 12px;
+  }
+
+  .modal.generator .source-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .modal.generator .source-options label {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .modal.generator .source-options small {
+    width: 100%;
+    margin: 0 0 0 24px;
+  }
+
+  .modal.generator .generator-foot {
+    position: sticky;
+    bottom: -18px;
+    z-index: 3;
+    margin: 20px -18px -18px;
+    padding: 14px 18px 18px;
+    background: #fff;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 11px;
+  }
+
+  .modal.generator .generator-foot > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .modal.generator .generator-foot .button {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+  }
+}

@@ -58,6 +58,18 @@ To run the backend checks:
 backend/.venv/bin/python -m unittest backend.tests.test_core -v
 ```
 
+## Deploy the frontend to Vercel
+
+Import the repository into Vercel and set the project root directory to
+`frontend`. Use `npm run build` as the build command and `dist` as the output
+directory. Set `VITE_API_URL` to the public URL of the deployed FastAPI API,
+then redeploy. The frontend includes a SPA rewrite in `frontend/vercel.json`
+so direct refreshes keep working.
+
+The current SQLite adapter is for local/demo development. A production API
+needs a persistent database service and the SQLite adapter must be migrated to
+PostgreSQL before relying on hosted accounts or progress data.
+
 For a local container run, use `docker compose up`. Before production, replace `JWT_SECRET`, restrict `FRONTEND_ORIGIN`, configure a real database/backup policy, and connect an approved vision/AI provider.
 
 ## Roadmap
