@@ -56,6 +56,7 @@ class ProgressEvent(BaseModel):
 
 class TestAttemptCreate(BaseModel):
     test_id: str = Field(min_length=1, max_length=120)
+    config: dict[str, Any] = Field(default_factory=dict)
     score: float = Field(ge=0, le=100)
     correct: int = Field(ge=0, le=500)
     incorrect: int = Field(ge=0, le=500)
@@ -377,21 +378,20 @@ def create_test_session(config: TestConfig, user: dict[str, Any] = Depends(requi
     # Curated seeds are intentionally only used for the broad mixed starter set.
     # Targeted class/chapter/difficulty tests must come from the filtered bank,
     # otherwise a Class 11 or Hard test could contain unrelated seed questions.
-    curated = [question for question in SESSION_QUESTIONS if config.difficulty == "Mixed" and config.class_level == "Mixed" and (not config.chapter or config.chapter == "Full syllabus") and (config.subject == "Mixed" or question["subject"] == config.subject)]
+    curated = [question for question in SESSION_QUESTIONS if config.exam == "NEET-UG" and config.difficulty == "Mixed" and config.class_level == "Mixed" and (not config.chapter or config.chapter == "Full syllabus") and (config.subject == "Mixed" or question["subject"] == config.subject)]
     generated = content.question_bank(config.class_level, config.subject, config.difficulty)
     if config.chapter and config.chapter != "Full syllabus":
         generated = [question for question in generated if question["chapter"] == config.chapter or question["chapter"].endswith(f"· {config.chapter}")]
     available = curated + [question for question in generated if question["id"] not in {item["id"] for item in curated}]
+    used_question_ids = db.list_used_question_ids(user["id"])
+    available = [question for question in available if question["id"] not in used_question_ids]
     if not available:
-        raise HTTPException(status_code=422, detail="No approved questions are available for this configuration.")
+        raise HTTPException(status_code=409, detail="No fresh questions remain for this configuration. Choose another chapter, subject or difficulty.")
+    if len(available) < config.questions:
+        raise HTTPException(status_code=409, detail=f"Only {len(available)} fresh questions remain for this configuration. Choose a smaller test or a wider syllabus.")
     SystemRandom().shuffle(available)
-    # Keep the student's requested test size even when a narrow chapter has a
-    # smaller approved pool. Reuse the pool with unique session ids instead of
-    # silently opening a shorter test.
-    questions = [
-        {**available[index % len(available)], "id": f"{available[index % len(available)]['id']}-slot-{index + 1}"}
-        for index in range(config.questions)
-    ]
+    source = "NEET practice bank" if config.exam == "NEET-UG" else "CBSE chapter practice"
+    questions = [{**question, "exam": config.exam, "source": source, "id": f"{question['id']}-slot-{index + 1}"} for index, question in enumerate(available[:config.questions])]
     session = db.create_session(user["id"], config.model_dump(), questions, config.duration_minutes)
     return {"session": session, "question_count": len(questions), "notice": "Curated starter questions and full-syllabus chapter checks are available. Add approved PYQs for production exam simulation."}
 
@@ -427,7 +427,7 @@ def submit_test_session(session_id: str, user: dict[str, Any] = Depends(required
     session = db.submit_session(user["id"], session_id)
     if not session:
         raise HTTPException(status_code=409, detail="This test could not be submitted.")
-    db.create_attempt(user["id"], {"test_id": session_id, "score": session["score"], "correct": session["correct"], "incorrect": session["incorrect"], "unanswered": session["unanswered"], "duration_seconds": 0})
+    db.create_attempt(user["id"], {"test_id": session_id, "config": session["config"], "score": session["score"], "correct": session["correct"], "incorrect": session["incorrect"], "unanswered": session["unanswered"], "duration_seconds": 0})
     for question_index, question in enumerate(session["questions"]):
         answer = session["answers"].get(str(question_index))
         if answer is None or answer != question.get("answer"):

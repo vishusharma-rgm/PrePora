@@ -76,6 +76,7 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 test_id TEXT NOT NULL,
+                config TEXT NOT NULL DEFAULT '{}',
                 score REAL NOT NULL DEFAULT 0,
                 correct INTEGER NOT NULL DEFAULT 0,
                 incorrect INTEGER NOT NULL DEFAULT 0,
@@ -125,6 +126,9 @@ def init_db() -> None:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(study_items)").fetchall()}
         if "details" not in columns:
             connection.execute("ALTER TABLE study_items ADD COLUMN details TEXT")
+        attempt_columns = {row[1] for row in connection.execute("PRAGMA table_info(test_attempts)").fetchall()}
+        if "config" not in attempt_columns:
+            connection.execute("ALTER TABLE test_attempts ADD COLUMN config TEXT NOT NULL DEFAULT '{}'")
 
 
 def hash_password(password: str) -> str:
@@ -254,10 +258,12 @@ def record_progress_event(user_id: str, event_type: str, value: int, subject: st
 
 
 def create_attempt(user_id: str, values: dict[str, Any]) -> dict[str, Any]:
+    config = values.get("config", {})
     attempt = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "test_id": values["test_id"],
+        "config": json.dumps(config if isinstance(config, dict) else {}),
         "score": values.get("score", 0),
         "correct": values.get("correct", 0),
         "incorrect": values.get("incorrect", 0),
@@ -269,8 +275,8 @@ def create_attempt(user_id: str, values: dict[str, Any]) -> dict[str, Any]:
         connection.execute(
             """
             INSERT INTO test_attempts
-            (id, user_id, test_id, score, correct, incorrect, unanswered, duration_seconds, created_at)
-            VALUES (:id, :user_id, :test_id, :score, :correct, :incorrect, :unanswered, :duration_seconds, :created_at)
+            (id, user_id, test_id, config, score, correct, incorrect, unanswered, duration_seconds, created_at)
+            VALUES (:id, :user_id, :test_id, :config, :score, :correct, :incorrect, :unanswered, :duration_seconds, :created_at)
             """,
             attempt,
         )
@@ -283,7 +289,24 @@ def list_attempts(user_id: str, limit: int = 20) -> list[dict[str, Any]]:
             "SELECT * FROM test_attempts WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
             (user_id, min(max(limit, 1), 100)),
         ).fetchall()
-    return [dict(row) for row in rows]
+    attempts = []
+    for row in rows:
+        attempt = dict(row)
+        attempt["config"] = _json(attempt.get("config"), {})
+        attempts.append(attempt)
+    return attempts
+
+
+def list_used_question_ids(user_id: str) -> set[str]:
+    """Return the original question IDs already assigned to this student's tests."""
+    with connect() as connection:
+        rows = connection.execute("SELECT questions FROM test_sessions WHERE user_id = ?", (user_id,)).fetchall()
+    used: set[str] = set()
+    for row in rows:
+        for question in _json(row["questions"], []):
+            question_id = str(question.get("id", ""))
+            used.add(question_id.split("-slot-", 1)[0])
+    return used
 
 
 def create_session(user_id: str, config: dict[str, Any], questions: list[dict[str, Any]], duration_minutes: int) -> dict[str, Any]:

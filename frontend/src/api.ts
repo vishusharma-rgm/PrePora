@@ -67,20 +67,21 @@ export async function updateProfile(token: string, values: { name?: string; targ
 
 export type RemoteExamQuestion = { id: string; subject: Subject; chapter: string; text: string; options: string[] }
 export type RemoteTestSession = { id: string; status: string; questions: RemoteExamQuestion[]; answers: Record<string, number>; marked: number[]; expires_at: string; score?: number; correct?: number; incorrect?: number; unanswered?: number }
+export type TestAttempt = { id: string; test_id: string; config: { exam?: 'NEET-UG' | 'CBSE Boards'; subject?: Subject | 'Mixed'; class_level?: ClassLevel; chapter?: string; questions?: number; duration_minutes?: number; difficulty?: string }; score: number; correct: number; incorrect: number; unanswered: number; duration_seconds: number; created_at: string }
 
-export async function createRemoteTestSession(token: string, config?: { subject?: Subject | 'Mixed'; classLevel?: ClassLevel; chapter?: string; questions?: number; durationMinutes?: number; difficulty?: 'Easy' | 'Medium' | 'Hard' | 'Mixed' }): Promise<RemoteTestSession | null> {
+export async function createRemoteTestSession(token: string, config?: { exam?: 'NEET-UG' | 'CBSE Boards'; subject?: Subject | 'Mixed'; classLevel?: ClassLevel; chapter?: string; questions?: number; durationMinutes?: number; difficulty?: 'Easy' | 'Medium' | 'Hard' | 'Mixed' }): Promise<RemoteTestSession | null> {
   const response = await request('/api/tests/sessions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      exam: 'NEET-UG',
+      exam: config?.exam ?? 'NEET-UG',
       subject: config?.subject ?? 'Mixed',
       class_level: config?.classLevel ?? 'Mixed',
       chapter: config?.chapter ?? 'Full syllabus',
       questions: config?.questions ?? 20,
       duration_minutes: config?.durationMinutes ?? 25,
       difficulty: config?.difficulty ?? 'Mixed',
-      negative_marking: true,
+      negative_marking: (config?.exam ?? 'NEET-UG') === 'NEET-UG',
     }),
   })
   if (!response?.ok) return null
@@ -97,6 +98,11 @@ export async function submitRemoteTestSession(token: string, sessionId: string):
   if (!response?.ok) return null
   const payload = await response.json() as { session: RemoteTestSession }
   return payload.session
+}
+
+export async function loadTestAttempts(token: string): Promise<TestAttempt[] | null> {
+  const payload = await authedJson('/api/test-attempts', token)
+  return payload?.attempts ?? null
 }
 
 export type StudyItemDetails = {
