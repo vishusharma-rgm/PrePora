@@ -1,5 +1,6 @@
 import os
 import re
+from random import SystemRandom
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
@@ -31,6 +32,8 @@ class TestConfig(BaseModel):
     duration_minutes: int = Field(ge=15, le=240)
     difficulty: Literal["Easy", "Medium", "Hard", "Mixed"]
     negative_marking: bool = True
+    class_level: Literal["11th", "12th", "Mixed"] = "Mixed"
+    chapter: str | None = Field(default=None, max_length=160)
 
 
 class AuthPayload(BaseModel):
@@ -371,11 +374,17 @@ def session_with_expiry(user_id: str, session_id: str) -> dict[str, Any] | None:
 
 @app.post("/api/tests/sessions")
 def create_test_session(config: TestConfig, user: dict[str, Any] = Depends(required_user)) -> dict[str, Any]:
-    curated = [question for question in SESSION_QUESTIONS if config.subject == "Mixed" or question["subject"] == config.subject]
-    generated = content.question_bank("Mixed", config.subject, config.difficulty)
+    # Curated seeds are intentionally only used for the broad mixed starter set.
+    # Targeted class/chapter/difficulty tests must come from the filtered bank,
+    # otherwise a Class 11 or Hard test could contain unrelated seed questions.
+    curated = [question for question in SESSION_QUESTIONS if config.difficulty == "Mixed" and config.class_level == "Mixed" and (not config.chapter or config.chapter == "Full syllabus") and (config.subject == "Mixed" or question["subject"] == config.subject)]
+    generated = content.question_bank(config.class_level, config.subject, config.difficulty)
+    if config.chapter and config.chapter != "Full syllabus":
+        generated = [question for question in generated if question["chapter"] == config.chapter or question["chapter"].endswith(f"· {config.chapter}")]
     available = curated + [question for question in generated if question["id"] not in {item["id"] for item in curated}]
     if not available:
         raise HTTPException(status_code=422, detail="No approved questions are available for this configuration.")
+    SystemRandom().shuffle(available)
     questions = available[:min(config.questions, len(available))]
     session = db.create_session(user["id"], config.model_dump(), questions, config.duration_minutes)
     return {"session": session, "question_count": len(questions), "notice": "Curated starter questions and full-syllabus chapter checks are available. Add approved PYQs for production exam simulation."}

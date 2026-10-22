@@ -20,7 +20,7 @@ class PrePoraCoreTests(unittest.TestCase):
         catalog = content_chapters("Mixed", "All")
         self.assertEqual(catalog["count"], 94)
         question_catalog = content_questions("Mixed", "Mixed", "Mixed", 500)
-        self.assertGreaterEqual(question_catalog["count"], 188)
+        self.assertGreaterEqual(question_catalog["count"], 564)
         reply = tutor_response(TutorPayload(prompt="Explain current electricity", subject="Physics", chapter="Current Electricity"), {})
         self.assertIn("V = IR", reply["reply"])
 
