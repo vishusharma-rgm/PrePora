@@ -65,7 +65,7 @@ export async function updateProfile(token: string, values: { name?: string; targ
   return authedJson('/api/profile', token, { method: 'PATCH', body: JSON.stringify(values) })
 }
 
-export type RemoteExamQuestion = { id: string; subject: Subject; chapter: string; text: string; options: string[] }
+export type RemoteExamQuestion = { id: string; subject: Subject; chapter: string; text: string; options: string[]; source?: string; is_repeat?: boolean }
 export type RemoteTestSession = { id: string; status: string; questions: RemoteExamQuestion[]; answers: Record<string, number>; marked: number[]; expires_at: string; score?: number; correct?: number; incorrect?: number; unanswered?: number }
 export type TestAttempt = { id: string; test_id: string; config: { exam?: 'NEET-UG' | 'CBSE Boards'; subject?: Subject | 'Mixed'; class_level?: ClassLevel; chapter?: string; questions?: number; duration_minutes?: number; difficulty?: string }; score: number; correct: number; incorrect: number; unanswered: number; duration_seconds: number; created_at: string }
 

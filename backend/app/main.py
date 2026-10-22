@@ -384,16 +384,34 @@ def create_test_session(config: TestConfig, user: dict[str, Any] = Depends(requi
         generated = [question for question in generated if question["chapter"] == config.chapter or question["chapter"].endswith(f"· {config.chapter}")]
     available = curated + [question for question in generated if question["id"] not in {item["id"] for item in curated}]
     used_question_ids = db.list_used_question_ids(user["id"])
-    available = [question for question in available if question["id"] not in used_question_ids]
+    fresh = [question for question in available if question["id"] not in used_question_ids]
     if not available:
-        raise HTTPException(status_code=409, detail="No fresh questions remain for this configuration. Choose another chapter, subject or difficulty.")
-    if len(available) < config.questions:
-        raise HTTPException(status_code=409, detail=f"Only {len(available)} fresh questions remain for this configuration. Choose a smaller test or a wider syllabus.")
-    SystemRandom().shuffle(available)
+        raise HTTPException(status_code=409, detail="No questions are available for this configuration. Choose another chapter, subject or difficulty.")
+    # Fresh questions are always preferred. Once a focused chapter's finite
+    # bank is exhausted, continue with a clearly labelled practice refresh so
+    # a student can still request 30/60 questions. Repeats are not duplicated
+    # inside the same test until the whole available pool has been cycled.
+    SystemRandom().shuffle(fresh)
+    selected = fresh[:config.questions]
+    repeat_count = max(0, config.questions - len(selected))
+    if repeat_count:
+        refresh_pool = list(available)
+        SystemRandom().shuffle(refresh_pool)
+        for index in range(repeat_count):
+            selected.append({**refresh_pool[index % len(refresh_pool)], "is_repeat": True})
     source = "NEET practice bank" if config.exam == "NEET-UG" else "CBSE chapter practice"
-    questions = [{**question, "exam": config.exam, "source": source, "id": f"{question['id']}-slot-{index + 1}"} for index, question in enumerate(available[:config.questions])]
+    questions = [{
+        **question,
+        "exam": config.exam,
+        "source": "Practice refresh" if question.get("is_repeat") else source,
+        "is_repeat": bool(question.get("is_repeat", False)),
+        "id": f"{question['id']}-slot-{index + 1}",
+    } for index, question in enumerate(selected)]
     session = db.create_session(user["id"], config.model_dump(), questions, config.duration_minutes)
-    return {"session": session, "question_count": len(questions), "notice": "Curated starter questions and full-syllabus chapter checks are available. Add approved PYQs for production exam simulation."}
+    notice = "Fresh questions selected from the practice bank."
+    if repeat_count:
+        notice = f"{len(fresh)} fresh questions were available; the remaining {repeat_count} are clearly labelled practice refresh questions."
+    return {"session": session, "question_count": len(questions), "notice": notice}
 
 
 @app.get("/api/tests/sessions/{session_id}")
